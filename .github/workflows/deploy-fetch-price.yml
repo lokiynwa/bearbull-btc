@@ -25,7 +25,7 @@ jobs:
       - name: Zip Lambda function
         run: |
           cd lambdas/fetchBTCPriceUSD
-          zip -r ../../../function.zip .
+          zip -r ../../function.zip .
 
       - name: Deploy Lambda
         run: |
