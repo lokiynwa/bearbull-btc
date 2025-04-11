@@ -1,7 +1,7 @@
 import json
 import urllib3
 
-#deployment test for AWS Lambda
+#deployment test for AWS Lambda 2
 
 def lambda_handler(event, context):
     http = urllib3.PoolManager()
