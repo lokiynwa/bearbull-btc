@@ -1,0 +1,32 @@
+name: Deploy FetchBTCPriceUSD Lambda
+
+on:
+  push:
+    paths:
+      - 'lambdas/fetchBTCPriceUSD/**'
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Zip Lambda function
+        run: |
+          cd lambdas/fetchBTCPriceUSD
+          zip -r ../../function.zip .
+
+      - name: Deploy to AWS Lambda
+        uses: aws-actions/aws-cli-action@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+          inline: |
+            aws lambda update-function-code \
+              --function-name FetchBTCPriceUSD \
+              --zip-file fileb://function.zip
