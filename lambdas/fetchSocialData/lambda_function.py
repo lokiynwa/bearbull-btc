@@ -36,7 +36,8 @@ def fetch_subreddit_posts(subreddit, token, limit=100):
 def fetch_nitter_tweets(username):
     url = f"https://nitter.poast.org/{username}/rss"
     try:
-        feed = feedparser.parse(url)
+        res = requests.get(url, timeout=5)
+        feed = feedparser.parse(res.text)
         return [entry.title for entry in feed.entries[:10]]
     except Exception as e:
         print(f"Failed to fetch from {username}: {e}")
