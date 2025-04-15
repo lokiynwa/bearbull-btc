@@ -34,7 +34,7 @@ def fetch_subreddit_posts(subreddit, token, limit=100):
 # --- Twitter via Nitter ---
 
 def fetch_nitter_tweets(username):
-    url = f"https://nitter.net/{username}/rss"
+    url = f"https://nitter.poast.org/{username}/rss"
     try:
         feed = feedparser.parse(url)
         return [entry.title for entry in feed.entries[:10]]
