@@ -22,10 +22,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Zip Lambda function
+      - name: Install dependencies and package Lambda
         run: |
-          cd lambdas/fetchSocialData
-          zip -r ../../function.zip .
+          mkdir -p build
+          cp lambdas/fetchSocialData/lambda_function.py build/
+          pip install requests -t build/
+          cd build
+          zip -r ../function.zip .
 
       - name: Deploy Lambda
         run: |
