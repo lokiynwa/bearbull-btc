@@ -30,12 +30,9 @@ def fetch_subreddit_posts(subreddit, token, limit=100):
 
 def is_relevant(title):
     keywords = [
-        "bitcoin", "btc", "crypto", "halving", "satoshi", "blockchain", "wallet",
-        "coinbase", "binance", "kraken", "hodl", "bull", "bear", "pump", "dump",
-        "buy", "sell", "price", "crash", "moon", "fomo", "etf", "volatility", "market",
-        "regulation", "mining", "trading", "investment", "portfolio", "loss", "gain",
-        "profit", "liquidate", "greed", "fear", "support", "resistance", "chart",
-        "prediction", "correction", "bottom", "top", "trend", "bullish", "bearish"
+        "worried", "excited", "scared", "unsure", "feel", "hype", "dumping",
+        "moon", "fear", "greed", "panic", "nervous", "bullish", "bearish",
+        "confused", "think", "believe", "bet", "opinion", "strategy"
     ]
     title_lower = title.lower()
     return any(word in title_lower for word in keywords)
@@ -46,8 +43,9 @@ def lambda_handler(event, context):
     
     all_titles = []
     for subreddit in subreddits:
-        titles = fetch_subreddit_posts(subreddit, token, limit=200)
+        titles = fetch_subreddit_posts(subreddit, token, limit=500)
         relevant_titles = [t for t in titles if is_relevant(t)]
+        print(f"{subreddit}: {len(relevant_titles)} relevant posts out of {len(titles)} fetched")
         all_titles.extend(relevant_titles)
 
     return {
