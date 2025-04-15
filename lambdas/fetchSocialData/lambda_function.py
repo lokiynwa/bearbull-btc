@@ -2,6 +2,9 @@ import os
 import json
 import requests
 from base64 import b64encode
+import feedparser
+
+# --- Reddit Token and Fetching ---
 
 def get_reddit_token():
     client_id = os.environ['REDDIT_CLIENT_ID']
@@ -28,27 +31,37 @@ def fetch_subreddit_posts(subreddit, token, limit=100):
     posts = res.json().get("data", {}).get("children", [])
     return [post["data"]["title"] for post in posts]
 
-def is_relevant(title):
-    keywords = [
-        "worried", "excited", "scared", "unsure", "feel", "hype", "dumping",
-        "moon", "fear", "greed", "panic", "nervous", "bullish", "bearish",
-        "confused", "think", "believe", "bet", "opinion", "strategy"
-    ]
-    title_lower = title.lower()
-    return any(word in title_lower for word in keywords)
+# --- Twitter via Nitter ---
+
+def fetch_nitter_tweets(username):
+    url = f"https://nitter.net/{username}/rss"
+    try:
+        feed = feedparser.parse(url)
+        return [entry.title for entry in feed.entries[:10]]
+    except Exception as e:
+        print(f"Failed to fetch from {username}: {e}")
+        return []
+
+# --- Combined Lambda Handler ---
 
 def lambda_handler(event, context):
-    token = get_reddit_token()
+    reddit_posts = []
+    twitter_posts = []
+
+    # Reddit
+    reddit_token = get_reddit_token()
     subreddits = ["Bitcoin", "CryptoCurrency", "CryptoMarkets"]
-    
-    all_titles = []
     for subreddit in subreddits:
-        titles = fetch_subreddit_posts(subreddit, token, limit=500)
-        relevant_titles = [t for t in titles if is_relevant(t)]
-        print(f"{subreddit}: {len(relevant_titles)} relevant posts out of {len(titles)} fetched")
-        all_titles.extend(relevant_titles)
+        titles = fetch_subreddit_posts(subreddit, reddit_token, limit=100)
+        reddit_posts.extend(titles)
+
+    # Twitter via Nitter
+    twitter_users = ["Saylor", "CryptoCobain", "TheCryptoDog", "TheBitcoinConf"]
+    for user in twitter_users:
+        tweets = fetch_nitter_tweets(user)
+        twitter_posts.extend(tweets)
 
     return {
         "statusCode": 200,
-        "body": json.dumps({"posts": all_titles})
+        "body": json.dumps({"reddit posts": reddit_posts, "twitter posts": twitter_posts})
     }
