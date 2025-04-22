@@ -3,7 +3,9 @@ import json
 import requests
 from datetime import datetime, timedelta
 from base64 import b64encode
-import feedparser
+import boto3
+
+comprehend = boto3.client("comprehend")
 
 # --- Reddit Token and Fetching ---
 
@@ -24,6 +26,13 @@ def get_reddit_token():
 
 def is_relevant(title):
     title_lower = title.lower()
+
+    if title_lower.startswith("how "):
+        return False
+    
+    if title_lower.startswith("i "):
+        return True
+    
     keywords = [
         "worried", "excited", "scared", "unsure", "feel", "hype", "dumping",
         "moon", "fear", "greed", "panic", "nervous", "bullish", "bearish",
@@ -44,16 +53,17 @@ def fetch_subreddit_posts(subreddit, token, limit=100):
     posts = res.json().get("data", {}).get("children", [])
     return [post["data"]["title"] for post in posts]
 
+# --- News Posts Fetching ---
+
 def fetch_bitcoin_news_sentiment():
     api_key = os.environ["ALPHAVANTAGE_API_KEY"]
-    
     time_from = (datetime.utcnow() - timedelta(days=1)).strftime("%Y%m%dT%H%M")
-    
+
     url = (
         f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT"
         f"&tickers=CRYPTO:BTC"
         f"&time_from={time_from}"
-        f"&limit=50"
+        f"&limit=300"
         f"&sort=LATEST"
         f"&apikey={api_key}"
     )
@@ -62,11 +72,35 @@ def fetch_bitcoin_news_sentiment():
         res = requests.get(url, timeout=5)
         data = res.json()
         articles = data.get("feed", [])
-
-        return [article["title"] for article in articles if "title" in article]
+        return [
+            {
+                "title": a["title"],
+                "sentiment": a.get("overall_sentiment_label"),
+                "score": a.get("overall_sentiment_score")
+            }
+            for a in articles if "title" in a
+        ]
     except Exception as e:
         print(f"Alpha Vantage error: {e}")
         return []
+
+def analyse_sentiment(posts):
+    results = []
+    
+    for title in posts[:100]:
+        try:
+            response = comprehend.detect_sentiment(Text=title, LanguageCode="en")
+            sentiment = response["Sentiment"]
+            score = response["SentimentScore"]
+            results.append({
+                "title": title,
+                "sentiment": sentiment,
+                "score": score
+            })
+        except Exception as e:
+            print(f"Sentiment analysis failed: {e}")
+    
+    return results
 
 
 def lambda_handler(event, context):
@@ -81,11 +115,21 @@ def lambda_handler(event, context):
         reddit_posts.extend(relevant_titles)
 
     reddit_posts = reddit_posts[:100]
+    print(f"\n🟥 Analysing {len(reddit_posts)} Reddit posts for sentiment...\n")
+    analysed_reddit = analyse_sentiment(reddit_posts)
+
+    for post in analysed_reddit:
+        print(f"[Reddit] {post['title']} → {post['sentiment']} (Score: {post['score']})")
 
     news_posts = fetch_bitcoin_news_sentiment()
-    print(f"Fetched {len(reddit_posts)} Reddit posts and {len(news_posts)} Bitcoin news headlines")
+    print(f"\n📰 Fetched {len(news_posts)} Bitcoin news headlines with sentiment:\n")
+    for article in news_posts:
+        print(f"[News] {article['title']} → {article['sentiment']} (Score: {article['score']})")
 
     return {
         "statusCode": 200,
-        "body": json.dumps({"reddit posts": reddit_posts, "news posts": news_posts})
+        "body": json.dumps({
+            "reddit sentiment": analysed_reddit,
+            "news sentiment": news_posts
+        })
     }
