@@ -63,7 +63,7 @@ def fetch_bitcoin_news_sentiment():
         f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT"
         f"&tickers=CRYPTO:BTC"
         f"&time_from={time_from}"
-        f"&limit=300"
+        f"&limit=20" # Set to 20 for testing
         f"&sort=LATEST"
         f"&apikey={api_key}"
     )
@@ -84,6 +84,25 @@ def fetch_bitcoin_news_sentiment():
         print(f"Alpha Vantage error: {e}")
         return []
 
+def classify_crypto_sentiment(text):
+    bullish_keywords = [
+        "moon", "rocket", "bull", "bullish", "rally", "breakout", "pumping",
+        "skyrocketing", "run", "green candle", "to the moon", "back to the bull run",
+        "hodl", "buy the dip", "invest", "profit", "gain", "positive"
+    ]
+    bearish_keywords = [
+        "dump", "crash", "bear", "bearish", "scared", "plummet", "correction", "bloodbath",
+        "red candle", "panic selling", "sell off", "loss", "negative", "fear", "uncertainty",
+    ]
+    text = text.lower()
+    if any(word in text for word in bullish_keywords):
+        return "BULLISH"
+    elif any(word in text for word in bearish_keywords):
+        return "BEARISH"
+    else:
+        return "UNKNOWN"
+
+
 def analyse_sentiment(posts):
     results = []
     
@@ -92,16 +111,22 @@ def analyse_sentiment(posts):
             response = comprehend.detect_sentiment(Text=title, LanguageCode="en")
             sentiment = response["Sentiment"]
             score = response["SentimentScore"]
+
+            # Add financial-specific sentiment
+            crypto_sentiment = classify_crypto_sentiment(title)
+
             results.append({
                 "title": title,
-                "sentiment": sentiment,
-                "score": score
+                "comprehend_sentiment": sentiment,
+                "comprehend_score": score,
+                "market_sentiment": crypto_sentiment
             })
         except Exception as e:
             print(f"Sentiment analysis failed: {e}")
     
     return results
 
+# --- Main Lambda Handler ---
 
 def lambda_handler(event, context):
     reddit_posts = []
@@ -114,7 +139,7 @@ def lambda_handler(event, context):
         print(f"{subreddit}: {len(relevant_titles)} relevant out of {len(titles)}")
         reddit_posts.extend(relevant_titles)
 
-    reddit_posts = reddit_posts[:100]
+    reddit_posts = reddit_posts[:20] # Set to 20 for testing
     print(f"\n🟥 Analysing {len(reddit_posts)} Reddit posts for sentiment...\n")
     analysed_reddit = analyse_sentiment(reddit_posts)
 
