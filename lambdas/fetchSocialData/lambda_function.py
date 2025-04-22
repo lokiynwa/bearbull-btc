@@ -1,6 +1,7 @@
 import os
 import json
 import requests
+from datetime import datetime, timedelta
 from base64 import b64encode
 import feedparser
 
@@ -31,19 +32,30 @@ def fetch_subreddit_posts(subreddit, token, limit=100):
     posts = res.json().get("data", {}).get("children", [])
     return [post["data"]["title"] for post in posts]
 
-# --- Twitter via Nitter ---
+def fetch_bitcoin_news_sentiment():
+    api_key = os.environ["ALPHAVANTAGE_API_KEY"]
+    
+    time_from = (datetime.utcnow() - timedelta(days=1)).strftime("%Y%m%dT%H%M")
+    
+    url = (
+        f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT"
+        f"&tickers=CRYPTO:BTC"
+        f"&time_from={time_from}"
+        f"&limit=50"
+        f"&sort=LATEST"
+        f"&apikey={api_key}"
+    )
 
-def fetch_nitter_tweets(username):
-    url = f"https://nitter.poast.org/{username}/rss"
     try:
         res = requests.get(url, timeout=5)
-        feed = feedparser.parse(res.text)
-        return [entry.title for entry in feed.entries[:10]]
+        data = res.json()
+        articles = data.get("feed", [])
+
+        return [article["title"] for article in articles if "title" in article]
     except Exception as e:
-        print(f"Failed to fetch from {username}: {e}")
+        print(f"Alpha Vantage error: {e}")
         return []
 
-# --- Combined Lambda Handler ---
 
 def lambda_handler(event, context):
     reddit_posts = []
@@ -56,13 +68,10 @@ def lambda_handler(event, context):
         titles = fetch_subreddit_posts(subreddit, reddit_token, limit=100)
         reddit_posts.extend(titles)
 
-    # Twitter via Nitter
-    twitter_users = ["Saylor", "CryptoCobain", "TheCryptoDog", "TheBitcoinConf"]
-    for user in twitter_users:
-        tweets = fetch_nitter_tweets(user)
-        twitter_posts.extend(tweets)
+    news_posts = fetch_bitcoin_news_sentiment()
+    print(f"Fetched {len(news_posts)} Bitcoin news headlines")
 
     return {
         "statusCode": 200,
-        "body": json.dumps({"reddit posts": reddit_posts, "twitter posts": twitter_posts})
+        "body": json.dumps({"reddit posts": reddit_posts, "news posts": news_posts})
     }
