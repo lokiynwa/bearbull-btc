@@ -22,6 +22,18 @@ def get_reddit_token():
     token = res.json().get("access_token")
     return token
 
+def is_relevant(title):
+    title_lower = title.lower()
+    keywords = [
+        "worried", "excited", "scared", "unsure", "feel", "hype", "dumping",
+        "moon", "fear", "greed", "panic", "nervous", "bullish", "bearish",
+        "confused", "think", "believe", "bet", "opinion", "strategy", "bull",
+        "bear", "run", "crash", "dump", "buy", "sell", "hodl", "invest", "investment",
+        "rebound", "rally", "risky"
+    ]
+    return any(keyword in title_lower for keyword in keywords)
+
+
 def fetch_subreddit_posts(subreddit, token, limit=100):
     headers = {
         "Authorization": f"bearer {token}",
@@ -59,17 +71,19 @@ def fetch_bitcoin_news_sentiment():
 
 def lambda_handler(event, context):
     reddit_posts = []
-    twitter_posts = []
-
-    # Reddit
     reddit_token = get_reddit_token()
     subreddits = ["Bitcoin", "CryptoCurrency", "CryptoMarkets"]
+
     for subreddit in subreddits:
         titles = fetch_subreddit_posts(subreddit, reddit_token, limit=100)
-        reddit_posts.extend(titles)
+        relevant_titles = [title for title in titles if is_relevant(title)]
+        print(f"{subreddit}: {len(relevant_titles)} relevant out of {len(titles)}")
+        reddit_posts.extend(relevant_titles)
+
+    reddit_posts = reddit_posts[:100]
 
     news_posts = fetch_bitcoin_news_sentiment()
-    print(f"Fetched {len(news_posts)} Bitcoin news headlines")
+    print(f"Fetched {len(reddit_posts)} Reddit posts and {len(news_posts)} Bitcoin news headlines")
 
     return {
         "statusCode": 200,
