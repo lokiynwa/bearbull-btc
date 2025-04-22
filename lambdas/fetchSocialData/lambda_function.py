@@ -144,7 +144,12 @@ def lambda_handler(event, context):
     analysed_reddit = analyse_sentiment(reddit_posts)
 
     for post in analysed_reddit:
-        print(f"[Reddit] {post['title']} → {post['sentiment']} (Score: {post['score']})")
+        print(
+    f"[Reddit] {post['title']} → "
+    f"Comprehend: {post['comprehend_sentiment']} ({post['comprehend_score']}) | "
+    f"Market: {post['market_sentiment']}"
+)
+
 
     news_posts = fetch_bitcoin_news_sentiment()
     print(f"\n📰 Fetched {len(news_posts)} Bitcoin news headlines with sentiment:\n")
