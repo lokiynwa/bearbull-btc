@@ -88,11 +88,12 @@ def classify_crypto_sentiment(text):
     bullish_keywords = [
         "moon", "rocket", "bull", "bullish", "rally", "breakout", "pumping",
         "skyrocketing", "run", "green candle", "to the moon", "back to the bull run",
-        "hodl", "buy the dip", "invest", "profit", "gain", "positive"
+        "hodl", "buy the dip", "invest", "profit", "gain", "rallies",
+        "uptrend", "optimistic", "surge", "rise", "increase", "gain" 
     ]
     bearish_keywords = [
         "dump", "crash", "bear", "bearish", "scared", "plummet", "correction", "bloodbath",
-        "red candle", "panic selling", "sell off", "loss", "negative", "fear", "uncertainty",
+        "red candle", "panic selling", "sell off", "loss"
     ]
     text = text.lower()
     if any(word in text for word in bullish_keywords):
@@ -126,40 +127,110 @@ def analyse_sentiment(posts):
     
     return results
 
+def map_sentiment_to_score(comp_score, market_sentiment):
+    pos = comp_score["Positive"]
+    neg = comp_score["Negative"]
+    mixed = comp_score["Mixed"]
+    neutral = comp_score["Neutral"]
+
+    if pos >= 0.7 and neg < 0.3:
+        return 0.5 if market_sentiment == "BULLISH" else 0.3 if market_sentiment == "UNKNOWN" else 0.1
+    if neg >= 0.7 and pos < 0.3:
+        return -0.5 if market_sentiment == "BEARISH" else -0.3 if market_sentiment == "UNKNOWN" else -0.1
+    if pos >= 0.5 and neg >= 0.5:
+        return 0.2 if market_sentiment == "BULLISH" else -0.2 if market_sentiment == "BEARISH" else 0
+    if mixed > 0.3 or neutral > 0.5:
+        return 0.2 if market_sentiment == "BULLISH" else -0.2 if market_sentiment == "BEARISH" else 0
+    if pos > neg and pos >= 0.5:
+        return 0.4 if market_sentiment == "BULLISH" else 0.2 if market_sentiment == "UNKNOWN" else 0.0
+    if neg > pos and neg >= 0.5:
+        return -0.4 if market_sentiment == "BEARISH" else -0.2 if market_sentiment == "UNKNOWN" else 0.0
+    return 0.2 if market_sentiment == "BULLISH" else -0.2 if market_sentiment == "BEARISH" else 0
+
+def score_label(score):
+    if score <= -0.35:
+        return "BEARISH"
+    elif -0.35 < score <= -0.15:
+        return "SOMEWHAT_BEARISH"
+    elif -0.15 < score < 0.15:
+        return "NEUTRAL"
+    elif 0.15 <= score < 0.35:
+        return "SOMEWHAT_BULLISH"
+    else:
+        return "BULLISH"
+
+def analyse_sentiment(posts):
+    results = []
+    for title in posts[:20]:
+        try:
+            response = comprehend.detect_sentiment(Text=title, LanguageCode="en")
+            sentiment = response["Sentiment"]
+            score = response["SentimentScore"]
+            market_sentiment = classify_crypto_sentiment(title)
+            final_score = map_sentiment_to_score(score, market_sentiment)
+            label = score_label(final_score)
+            results.append({
+                "title": title,
+                "comprehend_sentiment": sentiment,
+                "comprehend_score": score,
+                "market_sentiment": market_sentiment,
+                "final_score": final_score,
+                "sentiment_label": label
+            })
+        except Exception as e:
+            print(f"Sentiment analysis failed: {e}")
+    return results
+
 # --- Main Lambda Handler ---
 
 def lambda_handler(event, context):
-    reddit_posts = []
     reddit_token = get_reddit_token()
     subreddits = ["Bitcoin", "CryptoCurrency", "CryptoMarkets"]
-
+    reddit_posts = []
     for subreddit in subreddits:
         titles = fetch_subreddit_posts(subreddit, reddit_token, limit=100)
-        relevant_titles = [title for title in titles if is_relevant(title)]
-        print(f"{subreddit}: {len(relevant_titles)} relevant out of {len(titles)}")
-        reddit_posts.extend(relevant_titles)
+        reddit_posts.extend([title for title in titles if is_relevant(title)])
+    reddit_posts = reddit_posts[:20]
 
-    reddit_posts = reddit_posts[:20] # Set to 20 for testing
-    print(f"\n🟥 Analysing {len(reddit_posts)} Reddit posts for sentiment...\n")
     analysed_reddit = analyse_sentiment(reddit_posts)
+    reddit_avg = sum([p['final_score'] for p in analysed_reddit]) / len(analysed_reddit) if analysed_reddit else 0
+    reddit_label = score_label(reddit_avg)
 
     for post in analysed_reddit:
         print(
-    f"[Reddit] {post['title']} → "
-    f"Comprehend: {post['comprehend_sentiment']} ({post['comprehend_score']}) | "
-    f"Market: {post['market_sentiment']}"
-)
-
+            f"[Reddit] {post['title']}\n"
+            f"  → Comprehend: {post['comprehend_sentiment']} | Market: {post['market_sentiment']}\n"
+            f"  → Final Score: {post['final_score']:.2f} → {post['sentiment_label']}\n"
+        )
 
     news_posts = fetch_bitcoin_news_sentiment()
-    print(f"\n📰 Fetched {len(news_posts)} Bitcoin news headlines with sentiment:\n")
-    for article in news_posts:
-        print(f"[News] {article['title']} → {article['sentiment']} (Score: {article['score']})")
+    news_scores = [a['score'] for a in news_posts if isinstance(a['score'], (int, float))]
+    news_avg = sum(news_scores) / len(news_scores) if news_scores else 0
+    news_label = score_label(news_avg)
+
+    overall_score = (reddit_avg + news_avg) / 2
+    overall_label = score_label(overall_score)
+
+    print(f"\nReddit Sentiment → {reddit_label} ({reddit_avg:.3f})")
+    print(f"News Sentiment → {news_label} ({news_avg:.3f})")
+    print(f"Overall Market Sentiment → {overall_label} ({overall_score:.3f})")
 
     return {
         "statusCode": 200,
         "body": json.dumps({
-            "reddit sentiment": analysed_reddit,
-            "news sentiment": news_posts
+            "reddit": {
+                "average_score": reddit_avg,
+                "label": reddit_label,
+                "posts": analysed_reddit
+            },
+            "news": {
+                "average_score": news_avg,
+                "label": news_label,
+                "posts": news_posts
+            },
+            "overall": {
+                "average_score": overall_score,
+                "label": overall_label
+            }
         })
     }
