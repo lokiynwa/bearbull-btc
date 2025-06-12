@@ -1,8 +1,6 @@
 import json
 import urllib3
 
-#deployment test for AWS Lambda 2
-
 def lambda_handler(event, context):
     http = urllib3.PoolManager()
     url = 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd'

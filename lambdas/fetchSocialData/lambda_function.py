@@ -84,6 +84,26 @@ def fetch_bitcoin_news_sentiment():
         print(f"Alpha Vantage error: {e}")
         return []
 
+def fetch_fear_and_greed_index():
+    try:
+        url = "https://api.alternative.me/fng/?limit=1"
+        res = requests.get(url, timeout=5)
+        res.raise_for_status()
+        data = res.json().get("data", [])
+        if data:
+            value = int(data[0]['value'])
+            classification = data[0]['value_classification']
+            return {
+                "classification": classification,
+                "score": float(value)
+            }
+    except requests.exceptions.RequestException as e:
+        print(f"Could not fetch Fear and Greed Index: {e}")
+    except (KeyError, IndexError, ValueError) as e:
+        print(f"Error parsing Fear and Greed Index data: {e}")
+    
+    return None
+
 def classify_crypto_sentiment(text):
     bullish_keywords = [
         "moon", "rocket", "bull", "bullish", "rally", "breakout", "pumping",
@@ -133,19 +153,26 @@ def map_sentiment_to_score(comp_score, market_sentiment):
     mixed = comp_score["Mixed"]
     neutral = comp_score["Neutral"]
 
-    if pos >= 0.7 and neg < 0.3:
-        return 0.5 if market_sentiment == "BULLISH" else 0.3 if market_sentiment == "UNKNOWN" else 0.1
-    if neg >= 0.7 and pos < 0.3:
-        return -0.5 if market_sentiment == "BEARISH" else -0.3 if market_sentiment == "UNKNOWN" else -0.1
-    if pos >= 0.5 and neg >= 0.5:
-        return 0.2 if market_sentiment == "BULLISH" else -0.2 if market_sentiment == "BEARISH" else 0
-    if mixed > 0.3 or neutral > 0.5:
-        return 0.2 if market_sentiment == "BULLISH" else -0.2 if market_sentiment == "BEARISH" else 0
-    if pos > neg and pos >= 0.5:
-        return 0.4 if market_sentiment == "BULLISH" else 0.2 if market_sentiment == "UNKNOWN" else 0.0
-    if neg > pos and neg >= 0.5:
-        return -0.4 if market_sentiment == "BEARISH" else -0.2 if market_sentiment == "UNKNOWN" else 0.0
-    return 0.2 if market_sentiment == "BULLISH" else -0.2 if market_sentiment == "BEARISH" else 0
+    if pos > 0.5 and market_sentiment == "BULLISH":
+        return 0.5
+    elif pos > 0.5 and market_sentiment == "UNKNOWN":
+        return 0.2
+    elif pos > 0.5 and market_sentiment == "BEARISH":
+        return 0.05
+
+    if neg > 0.5 and market_sentiment == "BEARISH":
+        return -0.5
+    elif neg > 0.5 and market_sentiment == "UNKNOWN":
+        return -0.2
+    elif neg > 0.5 and market_sentiment == "BULLISH":
+        return -0.05
+
+    if market_sentiment == "BULLISH":
+        return 0.25
+    elif market_sentiment == "BEARISH":
+        return -0.25
+
+    return 0.0
 
 def score_label(score):
     if score <= -0.35:
@@ -193,27 +220,35 @@ def lambda_handler(event, context):
     reddit_posts = reddit_posts[:20]
 
     analysed_reddit = analyse_sentiment(reddit_posts)
-    reddit_avg = sum([p['final_score'] for p in analysed_reddit]) / len(analysed_reddit) if analysed_reddit else 0
-    reddit_label = score_label(reddit_avg)
-
-    for post in analysed_reddit:
-        print(
-            f"[Reddit] {post['title']}\n"
-            f"  → Comprehend: {post['comprehend_sentiment']} | Market: {post['market_sentiment']}\n"
-            f"  → Final Score: {post['final_score']:.2f} → {post['sentiment_label']}\n"
-        )
+    reddit_avg = sum([p['final_score'] for p in analysed_reddit]) / len(analysed_reddit) * 100 + 50 if analysed_reddit else None
+    reddit_label = score_label(reddit_avg) if reddit_avg is not None else "N/A"
 
     news_posts = fetch_bitcoin_news_sentiment()
     news_scores = [a['score'] for a in news_posts if isinstance(a['score'], (int, float))]
-    news_avg = sum(news_scores) / len(news_scores) if news_scores else 0
-    news_label = score_label(news_avg)
+    news_avg = sum(news_scores) / len(news_scores) * 100 + 50 if news_scores else None
+    news_label = score_label(news_avg) if news_avg is not None else "N/A"
 
-    overall_score = (reddit_avg + news_avg) / 2
-    overall_label = score_label(overall_score)
+    fng_data = fetch_fear_and_greed_index()
+    if fng_data:
+        fng_score = fng_data["score"]
+        fng_label = fng_data["classification"]
+    else:
+        fng_score = None
+        fng_label = "N/A"
+
+    valid_scores = [score for score in [reddit_avg, news_avg, fng_score] if score is not None]
+
+    if valid_scores:
+        overall_score = round(sum(valid_scores) / len(valid_scores))
+        overall_label = score_label(overall_score)
+    else:
+        overall_score = None
+        overall_label = "N/A"
 
     print(f"\nReddit Sentiment → {reddit_label} ({reddit_avg:.3f})")
     print(f"News Sentiment → {news_label} ({news_avg:.3f})")
-    print(f"Overall Market Sentiment → {overall_label} ({overall_score:.3f})")
+    print(f"News Sentiment → {fng_label} ({fng_score:.3f})")
+    print(f"Overall Market Sentiment → {overall_label} ({overall_score})")
 
     return {
         "statusCode": 200,
