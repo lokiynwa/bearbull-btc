@@ -56,22 +56,34 @@ def fetch_subreddit_posts(subreddit, token, limit=100):
 # --- News Posts Fetching ---
 
 def fetch_bitcoin_news_sentiment():
-    api_key = os.environ["ALPHAVANTAGE_API_KEY"]
+    try:
+        api_key = os.environ["ALPHAVANTAGE_API_KEY"]
+    except KeyError:
+        print("[ERROR] ALPHAVANTAGE_API_KEY environment variable not set.")
+        return []
+
     time_from = (datetime.utcnow() - timedelta(days=1)).strftime("%Y%m%dT%H%M")
 
     url = (
         f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT"
         f"&tickers=CRYPTO:BTC"
         f"&time_from={time_from}"
-        f"&limit=20" # Set to 20 for testing
+        f"&limit=20"
         f"&sort=LATEST"
         f"&apikey={api_key}"
     )
 
     try:
         res = requests.get(url, timeout=5)
+        res.raise_for_status()
         data = res.json()
-        articles = data.get("feed", [])
+
+        if "feed" not in data:
+            print(f"[WARN] No 'feed' in response: {data}")
+            return []
+
+        articles = data["feed"]
+
         return [
             {
                 "title": a["title"],
@@ -80,9 +92,16 @@ def fetch_bitcoin_news_sentiment():
             }
             for a in articles if "title" in a
         ]
+
+    except requests.exceptions.RequestException as e:
+        print(f"[ERROR] Request to Alpha Vantage failed: {e}")
+    except ValueError:
+        print("[ERROR] Failed to parse JSON response from Alpha Vantage.")
     except Exception as e:
-        print(f"Alpha Vantage error: {e}")
-        return []
+        print(f"[ERROR] Unexpected error in fetch_bitcoin_news_sentiment: {e}")
+
+    return []
+
 
 def fetch_fear_and_greed_index():
     try:
@@ -150,8 +169,6 @@ def analyse_sentiment(posts):
 def map_sentiment_to_score(comp_score, market_sentiment):
     pos = comp_score["Positive"]
     neg = comp_score["Negative"]
-    mixed = comp_score["Mixed"]
-    neutral = comp_score["Neutral"]
 
     if pos > 0.5 and market_sentiment == "BULLISH":
         return 0.5
@@ -188,6 +205,8 @@ def score_label(score):
 
 def analyse_sentiment(posts):
     results = []
+    errors = 0
+
     for title in posts[:20]:
         try:
             response = comprehend.detect_sentiment(Text=title, LanguageCode="en")
@@ -196,6 +215,7 @@ def analyse_sentiment(posts):
             market_sentiment = classify_crypto_sentiment(title)
             final_score = map_sentiment_to_score(score, market_sentiment)
             label = score_label(final_score)
+
             results.append({
                 "title": title,
                 "comprehend_sentiment": sentiment,
@@ -204,8 +224,13 @@ def analyse_sentiment(posts):
                 "final_score": final_score,
                 "sentiment_label": label
             })
+
         except Exception as e:
-            print(f"Sentiment analysis failed: {e}")
+            print(f"[WARN] Failed sentiment analysis for: '{title[:80]}' → {e}")
+            errors += 1
+
+    print(f"[INFO] Sentiment analysis: {errors} failed, {len(results)} succeeded.")
+
     return results
 
 # --- Main Lambda Handler ---
@@ -220,15 +245,34 @@ def lambda_handler(event, context):
     reddit_posts = reddit_posts[:20]
 
     analysed_reddit = analyse_sentiment(reddit_posts)
-    reddit_avg = sum([p['final_score'] for p in analysed_reddit]) / len(analysed_reddit) * 100 + 50 if analysed_reddit else None
-    reddit_label = score_label(reddit_avg) if reddit_avg is not None else "N/A"
+
+    if analysed_reddit:
+        reddit_avg = sum([p['final_score'] for p in analysed_reddit]) / len(analysed_reddit) * 100 + 50
+        reddit_label = score_label(reddit_avg)
+    else:
+        reddit_avg = None
+        reddit_label = "N/A"
 
     news_posts = fetch_bitcoin_news_sentiment()
-    news_scores = [a['score'] for a in news_posts if isinstance(a['score'], (int, float))]
-    news_avg = sum(news_scores) / len(news_scores) * 100 + 50 if news_scores else None
-    news_label = score_label(news_avg) if news_avg is not None else "N/A"
+    news_scores = []
+
+    for article in news_posts:
+        try:
+            score = float(article['score'])
+            news_scores.append(score)
+        except (KeyError, TypeError, ValueError):
+            print(f"[WARN] Skipping invalid news score: {article.get('score')}")
+
+    if news_scores:
+        capped_avg = max(-0.5, min(0.5, sum(news_scores) / len(news_scores) * 1.5))
+        news_avg = round(capped_avg * 100 + 50, 2)
+        news_label = score_label(news_avg)
+    else:
+        news_avg = None
+        news_label = "N/A"
 
     fng_data = fetch_fear_and_greed_index()
+    
     if fng_data:
         fng_score = fng_data["score"]
         fng_label = fng_data["classification"]
@@ -245,23 +289,31 @@ def lambda_handler(event, context):
         overall_score = None
         overall_label = "N/A"
 
-    print(f"\nReddit Sentiment → {reddit_label} ({reddit_avg:.3f})")
-    print(f"News Sentiment → {news_label} ({news_avg:.3f})")
-    print(f"News Sentiment → {fng_label} ({fng_score:.3f})")
-    print(f"Overall Market Sentiment → {overall_label} ({overall_score})")
+    print(f"Reddit Sentiment → {reddit_label} ({reddit_avg:.3f})" if reddit_avg is not None else "Reddit Sentiment → N/A")
+    print(f"\nNews Sentiment → {news_label} ({news_avg:.3f})" if news_avg is not None else "News Sentiment → N/A")
+    print(f"\nFear and Greed Index → {fng_label} ({fng_score:.3f})" if fng_score is not None else "Fear and Greed Index → N/A")
+    print(f"\nOverall Market Sentiment → {overall_label} ({overall_score})" if overall_score is not None else "Overall Market Sentiment → N/A")
 
     return {
         "statusCode": 200,
+        "headers": {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*"
+        },
         "body": json.dumps({
             "reddit": {
-                "average_score": reddit_avg,
+                "average_score": round(reddit_avg, 3) if reddit_avg is not None else None,
                 "label": reddit_label,
                 "posts": analysed_reddit
             },
             "news": {
-                "average_score": news_avg,
+                "average_score": round(news_avg, 3) if news_avg is not None else None,
                 "label": news_label,
                 "posts": news_posts
+            },
+            "fear_and_greed_index": {
+                "score": fng_score,
+                "label": fng_label
             },
             "overall": {
                 "average_score": overall_score,
@@ -269,3 +321,4 @@ def lambda_handler(event, context):
             }
         })
     }
+

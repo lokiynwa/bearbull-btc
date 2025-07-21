@@ -8,7 +8,7 @@ This web app fetches the latest Bitcoin price from the CoinGecko API, collects r
 ## 📈 Features
 
 - ✅ Fetch live Bitcoin price in USD  
-- ✅ Collect and analyse social media posts (Twitter + Reddit)  
+- ✅ Collect and analyse social media posts (Twitter + News Article)  
 - ✅ Perform sentiment analysis using **AWS Comprehend**  
 - ✅ Generate a Bear/Bull market sentiment score (0–100)  
 - ✅ Host on **AWS Lambda** and expose endpoints via **API Gateway**  
