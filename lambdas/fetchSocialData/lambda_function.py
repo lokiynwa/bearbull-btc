@@ -5,6 +5,55 @@ from datetime import datetime, timedelta
 from base64 import b64encode
 import boto3
 
+s3 = boto3.client("s3")
+BUCKET = os.environ['S3_BUCKET']
+if not BUCKET:
+    raise ValueError("S3_BUCKET environment variable not set.")
+
+def save_latest_snapshot_and_update_history(s3, bucket, snapshot_data, overall_score, date_str):
+    # 1. Save the new day's full snapshot (replace sentiment-latest.json)
+    try:
+        s3.put_object(
+            Bucket=bucket,
+            Key="sentiment-latest.json",
+            Body=json.dumps(snapshot_data, indent=2),
+            ContentType="application/json"
+        )
+        print("[INFO] Latest snapshot for today saved successfully.")
+    except Exception as e:
+        print(f"[ERROR] Failed to save latest full snapshot: {e}")
+        raise
+
+    # 2. Update history.json (append today's date and score)
+    try:
+        try:
+            obj = s3.get_object(Bucket=bucket, Key="history.json")
+            history = json.loads(obj["Body"].read())
+        except s3.exceptions.NoSuchKey:
+            history = []
+        except Exception as e:
+            print(f"[WARN] Could not load history.json: {e}")
+            history = []
+
+        history = [h for h in history if h.get("date") != date_str]
+        history.append({"date": date_str, "score": overall_score})
+
+        history = history[-2000:]
+
+        s3.put_object(
+            Bucket=bucket,
+            Key="history.json",
+            Body=json.dumps(history, indent=2),
+            ContentType="application/json"
+        )
+        print("[INFO] History updated.")
+
+    except Exception as e:
+        print(f"[ERROR] Could not update history.json: {e}")
+        raise
+
+
+
 comprehend = boto3.client("comprehend")
 
 # --- Reddit Token and Fetching ---
@@ -294,31 +343,41 @@ def lambda_handler(event, context):
     print(f"\nFear and Greed Index → {fng_label} ({fng_score:.3f})" if fng_score is not None else "Fear and Greed Index → N/A")
     print(f"\nOverall Market Sentiment → {overall_label} ({overall_score})" if overall_score is not None else "Overall Market Sentiment → N/A")
 
+    today_str = datetime.utcnow().strftime("%Y-%m-%d")
+    full_snapshot = {
+        "reddit": {
+            "average_score": round(reddit_avg, 3) if reddit_avg is not None else None,
+            "label": reddit_label,
+            "posts": analysed_reddit
+        },
+        "news": {
+            "average_score": round(news_avg, 3) if news_avg is not None else None,
+            "label": news_label,
+            "posts": news_posts
+        },
+        "fear_and_greed_index": {
+            "score": fng_score,
+            "label": fng_label
+        },
+        "overall": {
+            "average_score": overall_score,
+            "label": overall_label
+        }
+    }
+    if overall_score is not None:
+        try:
+            save_latest_snapshot_and_update_history(
+                s3, BUCKET, full_snapshot, overall_score, today_str
+            )
+        except Exception as e:
+            print(f"[WARN] Could not update snapshot/history: {e}")
+
     return {
         "statusCode": 200,
         "headers": {
             "Content-Type": "application/json",
             "Access-Control-Allow-Origin": "*"
         },
-        "body": json.dumps({
-            "reddit": {
-                "average_score": round(reddit_avg, 3) if reddit_avg is not None else None,
-                "label": reddit_label,
-                "posts": analysed_reddit
-            },
-            "news": {
-                "average_score": round(news_avg, 3) if news_avg is not None else None,
-                "label": news_label,
-                "posts": news_posts
-            },
-            "fear_and_greed_index": {
-                "score": fng_score,
-                "label": fng_label
-            },
-            "overall": {
-                "average_score": overall_score,
-                "label": overall_label
-            }
-        })
+        "body": json.dumps(full_snapshot)
     }
 
