@@ -1,0 +1,21 @@
+.header {
+  display: flex;
+  align-items: center;
+  background-color: #c1c1c1;
+  padding: 10px 40px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif;
+}
+
+.logo {
+  height: 40px;
+  width: auto;
+  margin-right: 22px;
+}
+
+.title {
+  font-size: 2rem;
+  color: #2C4C85;
+  font-weight: 800;
+  text-shadow: 0 0px 0 #fff, 0 0 4px rgba(44,76,133,0.07);
+}
