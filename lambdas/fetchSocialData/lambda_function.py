@@ -83,11 +83,10 @@ def is_relevant(title):
         return True
     
     keywords = [
-        "worried", "excited", "scared", "unsure", "feel", "hype", "dumping",
-        "moon", "fear", "greed", "panic", "nervous", "bullish", "bearish",
-        "confused", "think", "believe", "bet", "opinion", "strategy", "bull",
-        "bear", "run", "crash", "dump", "buy", "sell", "hodl", "invest", "investment",
-        "rebound", "rally", "risky"
+        "worried", "excited", "scared", "fear", "greed", "panic", "nervous", "bullish",
+        "bearish", "strategy", "bull", "bear", "run", "crash", "dump", "buy", "sell",
+        "hodl", "invest", "investment", "rebound", "rally", "risky", "profit", "loss",
+        "dip", "discount", "accumulate", "strong", "weak", "pump", "correction", "short", "long"
     ]
     return any(keyword in title_lower for keyword in keywords)
 
@@ -176,12 +175,14 @@ def classify_crypto_sentiment(text):
     bullish_keywords = [
         "moon", "rocket", "bull", "bullish", "rally", "breakout", "pumping",
         "skyrocketing", "run", "green candle", "to the moon", "back to the bull run",
-        "hodl", "buy the dip", "invest", "profit", "gain", "rallies",
-        "uptrend", "optimistic", "surge", "rise", "increase", "gain" 
+        "hodl", "buy the dip", "invest", "profit", "gain", "rallies", "discount", "cheap",
+        "uptrend", "optimistic", "surge", "rise", "increase", "gain", "accumulate", "strong", "ATH",
+        "pump", "rebound", "recover", "buying", "bought", "long"
     ]
     bearish_keywords = [
         "dump", "crash", "bear", "bearish", "scared", "plummet", "correction", "bloodbath",
-        "red candle", "panic selling", "sell off", "loss"
+        "red candle", "panic selling", "sell off", "loss", "dip", "dropping", "decline",
+        "weak", "liquidation", "sell", "selling", "short"
     ]
     text = text.lower()
     if any(word in text for word in bullish_keywords):
@@ -190,30 +191,6 @@ def classify_crypto_sentiment(text):
         return "BEARISH"
     else:
         return "UNKNOWN"
-
-
-def analyse_sentiment(posts):
-    results = []
-    
-    for title in posts[:100]:
-        try:
-            response = comprehend.detect_sentiment(Text=title, LanguageCode="en")
-            sentiment = response["Sentiment"]
-            score = response["SentimentScore"]
-
-            # Add financial-specific sentiment
-            crypto_sentiment = classify_crypto_sentiment(title)
-
-            results.append({
-                "title": title,
-                "comprehend_sentiment": sentiment,
-                "comprehend_score": score,
-                "market_sentiment": crypto_sentiment
-            })
-        except Exception as e:
-            print(f"Sentiment analysis failed: {e}")
-    
-    return results
 
 def map_sentiment_to_score(comp_score, market_sentiment):
     pos = comp_score["Positive"]
@@ -257,11 +234,14 @@ def analyse_sentiment(posts):
     errors = 0
 
     for title in posts[:20]:
+        market_sentiment = classify_crypto_sentiment(title)
+        if market_sentiment == "UNKNOWN":
+            continue
+
         try:
             response = comprehend.detect_sentiment(Text=title, LanguageCode="en")
             sentiment = response["Sentiment"]
             score = response["SentimentScore"]
-            market_sentiment = classify_crypto_sentiment(title)
             final_score = map_sentiment_to_score(score, market_sentiment)
             label = score_label(final_score)
 
@@ -291,7 +271,7 @@ def lambda_handler(event, context):
     for subreddit in subreddits:
         titles = fetch_subreddit_posts(subreddit, reddit_token, limit=100)
         reddit_posts.extend([title for title in titles if is_relevant(title)])
-    reddit_posts = reddit_posts[:20]
+    reddit_posts = reddit_posts[:80]
 
     analysed_reddit = analyse_sentiment(reddit_posts)
 
