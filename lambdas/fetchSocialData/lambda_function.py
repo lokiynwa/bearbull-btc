@@ -116,7 +116,7 @@ def fetch_bitcoin_news_sentiment():
         f"https://www.alphavantage.co/query?function=NEWS_SENTIMENT"
         f"&tickers=CRYPTO:BTC"
         f"&time_from={time_from}"
-        f"&limit=20"
+        f"&limit=100"
         f"&sort=LATEST"
         f"&apikey={api_key}"
     )
@@ -233,7 +233,7 @@ def analyse_sentiment(posts):
     results = []
     errors = 0
 
-    for title in posts[:20]:
+    for title in posts[:100]:
         market_sentiment = classify_crypto_sentiment(title)
         if market_sentiment == "UNKNOWN":
             continue
@@ -241,6 +241,8 @@ def analyse_sentiment(posts):
         try:
             response = comprehend.detect_sentiment(Text=title, LanguageCode="en")
             sentiment = response["Sentiment"]
+            if sentiment == "NEUTRAL":
+                continue
             score = response["SentimentScore"]
             final_score = map_sentiment_to_score(score, market_sentiment)
             label = score_label(final_score)
@@ -271,7 +273,7 @@ def lambda_handler(event, context):
     for subreddit in subreddits:
         titles = fetch_subreddit_posts(subreddit, reddit_token, limit=100)
         reddit_posts.extend([title for title in titles if is_relevant(title)])
-    reddit_posts = reddit_posts[:80]
+    reddit_posts = reddit_posts[:100]
 
     analysed_reddit = analyse_sentiment(reddit_posts)
 
