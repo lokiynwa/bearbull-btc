@@ -1,21 +1,20 @@
 .header {
   display: flex;
   align-items: center;
-  background-color: #c1c1c1;
-  padding: 10px 40px;
+  background-color: #1f1f1f;
+  padding: 12px clamp(16px, 4vw, 40px);
   box-shadow: 0 2px 4px rgba(0,0,0,0.08);
   font-family: 'Montserrat', 'Segoe UI', Arial, sans-serif;
 }
 
 .logo {
-  height: 40px;
+  height: clamp(36px, 6vw, 60px);
   width: auto;
-  margin-right: 22px;
+  margin-right: 18px;
 }
 
 .title {
-  font-size: 2rem;
-  color: #2C4C85;
+  font-size: clamp(1.25rem, 3.6vw, 2rem);
+  color: #ffffff;
   font-weight: 800;
-  text-shadow: 0 0px 0 #fff, 0 0 4px rgba(44,76,133,0.07);
 }

@@ -241,8 +241,6 @@ def analyse_sentiment(posts):
         try:
             response = comprehend.detect_sentiment(Text=title, LanguageCode="en")
             sentiment = response["Sentiment"]
-            if sentiment == "NEUTRAL":
-                continue
             score = response["SentimentScore"]
             final_score = map_sentiment_to_score(score, market_sentiment)
             label = score_label(final_score)
