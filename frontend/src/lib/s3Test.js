@@ -1,7 +1,8 @@
 import { downloadData } from 'aws-amplify/storage';
 
-const targetBucket =
-  { bucket: 'cryptoSentiment' }
+const targetBucket = {
+  bucket: { bucketName: 'crypto-sentiment-cache-loki', region: 'us-east-1' }
+};
 
 export async function logS3SentimentFiles() {
   try {
