@@ -6,8 +6,11 @@ import NewsTicker from "./components/NewsTicker";
 import RedditRotator from "./components/RedditRotator";
 import FearGreedCard from "./components/FearGreedCard";
 import PriceCard from "./components/PriceCard";
+import { useEffect } from 'react';
+import { logS3SentimentFiles } from './lib/s3Test';
 
 export default function App() {
+  useEffect(() => { logS3SentimentFiles(); }, []);
   const sentimentValue = 67;
   const sentimentLabel =
     sentimentValue < 34 ? "Bearish" :
