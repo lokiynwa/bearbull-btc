@@ -9,6 +9,7 @@
   --label-gap: clamp(6px, 1.4vw, 14px);
   --side-size: clamp(64px, 16vw, 140px);
   --gauge-gap-pull: clamp(80px, 14vw, 240px);
+  --stack-gap: clamp(10px, 1.6vw, 16px);
 }
 
 html, body, #root { height: 100%; }
@@ -23,7 +24,8 @@ html, body {
 
 .app { min-height: 100%; display: flex; flex-direction: column; }
 
-.main { flex: 1; display: grid; place-items: center; padding: clamp(12px, 2.5vw, 24px); }
+.main {  padding: clamp(12px, 2.5vw, 24px);
+  padding-top: 0;  }
 
 .panel {
   width: min(96vw, 1080px);
@@ -153,7 +155,7 @@ html, body {
 .ticker-header{
   display:flex;
   align-items:center;
-  justify-content: center;
+  justify-content:center;
   padding: 8px 12px;
   border-bottom:1px solid #2a2a2a;
 }
@@ -163,28 +165,35 @@ html, body {
   color:#fff;
   font-weight:800;
   font-size: clamp(14px, 2.6vw, 18px);
+  text-align:center;
 }
 
-.ticker-viewport{ overflow:hidden; white-space:nowrap; }
+.ticker-viewport{
+  overflow:hidden;
+  white-space:nowrap;
+  padding: 10px 12px;
+}
 
 .ticker-track{
   display:inline-flex;
   align-items:center;
-  gap: clamp(18px, 2.4vw, 28px);
-  padding: 10px 12px;
-  animation: ticker var(--ticker-duration, 60s) linear infinite;
+  gap: 0;
+  padding: 0;
+  animation: ticker var(--ticker-duration, 40s) linear infinite;
 }
 
 .ticker-item{
-  color:#eaeaea;
+  display:inline-block;
   font-size: clamp(14px, 2.5vw, 16px);
-  white-space:nowrap;
+  color:#eaeaea;
+  padding: 0 .75rem;
 }
 
-.ticker-item::after{
-  content:" • ";
+.ticker-sep{
+  display:inline-block;
+  padding: 0 .75rem;
+  color:#eaeaea;
   opacity:.45;
-  margin: 0 .75rem;
 }
 
 @keyframes ticker{
@@ -230,23 +239,30 @@ html, body {
 .reddit-logo{ width:22px; height:22px; flex:0 0 22px; border-radius:50%; }
 .reddit-title{ display:flex; align-items:center; gap:8px; color:#fff; font-weight:800; }
 .reddit-list{
-  list-style:none;
-  padding:0;
-  margin:0;
-  display:grid;
-  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 .reddit-item{
-  display:flex;
-  align-items:flex-start;
-  gap:8px;
-  color:#dedede;
-  line-height:1.5;
-  font-size: clamp(14px, 2.8vw, 16px);
+  padding: 10px 0;
+  border-top: 1px solid #2a2a2a;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
-.reddit-sub{ color:#fff; font-weight:700; }
-.reddit-sep{ opacity:.5; }
-
+.reddit-item:first-child{ border-top: 0; }
+.reddit-item::before{
+  content: "—";
+  color: #bdbdbd;
+  opacity: .9;
+  flex: 0 0 auto;
+}
+.reddit-text{
+  color: #e9e9e9;
+  line-height: 1.5;
+  font-size: clamp(14px, 2.6vw, 18px);
+  font-weight: 700;
+}
 .price-card{
   background:#1f1f1f;
   border:1px solid #2a2a2a;
