@@ -6,24 +6,34 @@ export default function NewsTicker({ items = [], speedPxPerSec = 80 }) {
   const [durationSec, setDurationSec] = useState(40);
 
   useEffect(() => {
-    function measure() {
-      const el = trackRef.current;
-      if (!el) return;
-      const w = el.scrollWidth || 1;
+    const el = trackRef.current;
+
+    const measure = () => {
+      const node = trackRef.current || el;
+      if (!node) return;
+      const w = node.scrollWidth || 1;
       const pxps = Math.max(20, speedPxPerSec);
       setDurationSec(w / pxps);
-    }
+    };
+
     measure();
     const t1 = setTimeout(measure, 50);
     const t2 = setTimeout(measure, 250);
+
     const ro = "ResizeObserver" in window ? new ResizeObserver(measure) : null;
-    if (ro && trackRef.current) ro.observe(trackRef.current);
+    if (ro && el) ro.observe(el);
+
     window.addEventListener("resize", measure);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(measure).catch(() => {});
+    }
+
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      if (ro && trackRef.current) ro.disconnect();
       window.removeEventListener("resize", measure);
+      if (ro && el) ro.unobserve(el);
+      if (ro) ro.disconnect();
     };
   }, [safe, speedPxPerSec]);
 
