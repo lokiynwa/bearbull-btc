@@ -1,6 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 
-export default function NewsTicker({ items = [], speedPxPerSec = 80 }) {
+export default function NewsTicker({
+  items = [],
+  speedPxPerSec = 80,
+  live = true,
+}) {
   const safe = useMemo(() => items.filter(Boolean), [items]);
   const trackRef = useRef(null);
   const [durationSec, setDurationSec] = useState(40);
@@ -59,9 +63,15 @@ export default function NewsTicker({ items = [], speedPxPerSec = 80 }) {
   };
 
   return (
-    <div className="ticker" aria-label="Market News">
+    <div className={`ticker ${live ? "ticker--live" : ""}`} aria-label="Market News">
       <div className="ticker-header">
         <h3 className="ticker-title">Market News</h3>
+        {live && (
+          <span className="ticker-badge" aria-hidden="true">
+            <span className="pulse-dot" />
+            LIVE
+          </span>
+        )}
       </div>
       <div className="ticker-viewport">
         <div className="ticker-track" ref={trackRef} style={style}>

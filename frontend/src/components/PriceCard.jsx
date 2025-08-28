@@ -1,48 +1,84 @@
 import React, { useMemo } from "react";
 
 function formatUSD(n) {
-  return n == null ? "—" : n.toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
+  if (n == null) return "—";
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
 }
 
-function buildPath(data, w = 100, h = 40) {
-  if (!data || data.length < 2) return "";
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const range = max - min || 1;
-  const stepX = w / (data.length - 1);
-  const points = data.map((v, i) => {
-    const x = i * stepX;
-    const y = h - ((v - min) / range) * h;
-    return `${i === 0 ? "M" : "L"}${x},${y}`;
-  });
-  return points.join(" ");
+function Sparkline({
+  data = [],
+  stroke = "#00c853",
+  vbWidth = 100,
+  vbHeight = 30,
+  strokeWidth = 3,
+}) {
+  const path = React.useMemo(() => {
+    if (!data || data.length < 2) return "";
+
+    const PAD = Math.max(2, Math.ceil(strokeWidth * 1.5));
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const span = max - min || 1;
+
+    const innerW = vbWidth - PAD * 2;
+    const innerH = vbHeight - PAD * 2;
+    const stepX = innerW / (data.length - 1);
+
+    const pts = data.map((v, i) => {
+      const x = PAD + i * stepX;
+      const y = PAD + (innerH - ((v - min) / span) * innerH);
+      return [x, y];
+    });
+
+    return pts.reduce(
+      (d, [x, y], i) => (i ? `${d} L ${x} ${y}` : `M ${x} ${y}`),
+      ""
+    );
+  }, [data, vbWidth, vbHeight, strokeWidth]);
+
+  return (
+    <svg
+      viewBox={`0 0 ${vbWidth} ${vbHeight}`}
+      preserveAspectRatio="none"
+      width="100%"
+      height="100%"
+      style={{ overflow: "visible" }}
+    >
+      <path
+        d={path}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
-export default function PriceCard({ price = null, changePct = 0, history = [] }) {
-  const color = changePct >= 0 ? "#00c853" : "#ff2d2d";
-  const sign = changePct >= 0 ? "+" : "−";
-  const path = useMemo(() => buildPath(history), [history]);
+
+export default function PriceCard({ price, change30dPct, history = [] }) {
+  const computedPct = useMemo(() => {
+    if (Number.isFinite(change30dPct)) return change30dPct;
+    if (history.length >= 2 && history[0] > 0) {
+      return ((history[history.length - 1] - history[0]) / history[0]) * 100;
+    }
+    return null;
+  }, [change30dPct, history]);
+
+  const up = (computedPct ?? 0) >= 0;
+  const color = up ? "#00c853" : "#ff3b30";
+  const pctText = computedPct == null ? "—" : `${up ? "+" : ""}${computedPct.toFixed(2)}%`;
 
   return (
     <section className="price-card">
-      <header className="price-head">
-        <span className="price-title">Bitcoin</span>
-        <span className="price-tag">BTC</span>
-      </header>
-      <div className="price-main">
-        <div className="price-value">{formatUSD(price)}</div>
-        <div className="price-change" style={{ color }}>
-          {sign}{Math.abs(changePct).toFixed(2)}%
-        </div>
+      <h3>BTC Price</h3>
+      <div className="price-row">
+        <div className="price-main">{formatUSD(price)}</div>
+        <div className="price-pct" style={{ color }}>{pctText} in 30d</div>
       </div>
-      <div className="sparkline" aria-hidden="true">
-        <svg viewBox="0 0 100 40" preserveAspectRatio="none">
-          <path d={path} stroke={color} strokeWidth="2" fill="none" />
-        </svg>
+      <div className="price-chart">
+        <Sparkline data={history} stroke={color} />
       </div>
     </section>
   );
