@@ -42,7 +42,7 @@ export default function App() {
           <BearBullGauge value={sentimentValue} label={sentimentLabel} />
           <Averages weekValues={weekValues || []} monthValues={monthValues || []} />
           <div className="gauge-desc">
-            This score ranges from 0 to 100, where 0 reflects extreme bearish sentiment and 100 reflects extreme bullish sentiment.
+            The Bitcoin Bear–Bull Meter tracks whether the market is leaning more bearish (pessimistic) or bullish (optimistic), ranging from 0 to 100.
             It combines AI-driven sentiment analysis of Reddit posts and news headlines with the Fear & Greed Index to give a daily market outlook.
           </div>
         </section>
