@@ -69,10 +69,16 @@ export function useSentimentData() {
     const monthAvg = monthValues.length ? Math.round(monthValues.reduce((a,b)=>a+b,0) / monthValues.length) : null;
 
     const gaugeScore = latest?.overall?.average_score ?? null;
-    const gaugeLabel = latest?.overall?.label
-      ? latest.overall.label.charAt(0) + latest.overall.label.slice(1).toLowerCase()
-      : (Number.isFinite(gaugeScore) ? scoreToLabel(gaugeScore) : "—");
 
+    const gaugeLabel = latest?.overall?.label
+      ? latest.overall.label
+          .replace(/_/g, " ")
+          .toLowerCase()
+          .split(" ")
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ")
+      : (Number.isFinite(gaugeScore) ? scoreToLabel(gaugeScore) : "—");
+    
     const fgScore = Number(latest?.fear_and_greed_index?.score);
     const fgValue = Number.isFinite(fgScore) ? Math.round(fgScore) : null;
 
