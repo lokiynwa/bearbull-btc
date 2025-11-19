@@ -218,13 +218,13 @@ def map_sentiment_to_score(comp_score, market_sentiment):
     return 0.0
 
 def score_label(score):
-    if score <= -0.35:
+    if score < 30:
         return "BEARISH"
-    elif -0.35 < score <= -0.15:
+    elif 30 <= score < 45:
         return "SOMEWHAT_BEARISH"
-    elif -0.15 < score < 0.15:
+    elif 45 <= score < 55:
         return "NEUTRAL"
-    elif 0.15 <= score < 0.35:
+    elif 55 <= score < 70:
         return "SOMEWHAT_BULLISH"
     else:
         return "BULLISH"
