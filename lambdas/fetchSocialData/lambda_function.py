@@ -221,11 +221,11 @@ def score_label(score):
     if score < 30:
         return "BEARISH"
     elif 30 <= score < 45:
-        return "SOMEWHAT_BEARISH"
+        return "SOMEWHAT BEARISH"
     elif 45 <= score < 55:
         return "NEUTRAL"
     elif 55 <= score < 70:
-        return "SOMEWHAT_BULLISH"
+        return "SOMEWHAT BULLISH"
     else:
         return "BULLISH"
 
